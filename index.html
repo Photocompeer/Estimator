@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="author" content="Abaye John Kwaku">
+        <meta name="description" content="Sales Invoice Management System">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sales Invoice & Measurements</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        colors: {
+                            'primary': '#4f46e5',
+                            'secondary': '#8b5cf6',
+                            'accent': '#10b981',
+                        },
+                        fontFamily: {
+                            sans: ['Inter', 'sans-serif'],
+                        },
+                    }
+                }
+            }
+        </script>
+        <style>
+            body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+            .card-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+            input[type="number"]::-webkit-inner-spin-button, 
+            input[type="number"]::-webkit-outer-spin-button { 
+                -webkit-appearance: none;
+                margin: 0;
+            }
+            input[type="number"] { -moz-appearance: textfield; }
+            .spinner {
+                border: 4px solid rgba(0, 0, 0, 0.1);
+                border-left-color: #fff;
+                border-radius: 50%;
+                width: 24px;
+                height: 24px;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin { to { transform: rotate(360deg); } }
+            .scrollable-list { max-height: 250px; overflow-y: auto; }
+            @media print {
+                body * { visibility: hidden; }
+                #printModal, #printModal * { visibility: visible; }
+                #printModal { position: absolute; left: 0; top: 0; width: 100%; height: auto; }
+                .print\:hidden { display: none !important; }
+            }
+
+            @keyframes pulse-red {
+                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+                70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+            }
+            .mic-active {
+                animation: pulse-red 2s infinite;
+                background-color: #ef4444 !important; /* Red color */
+            }
+        </style>
+    </head>
+
+    <body class="p-4 md:p-8">
+
+        <div class="max-w-4xl mx-auto mb-4 flex justify-end items-center space-x-3">
+            <div id="voice-indicator" class="hidden flex items-center space-x-2 text-red-500 font-bold animate-pulse">
+                <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+                <span class="text-xs uppercase tracking-widest">Listening...</span>
+            </div>
+
+            <button id="voice-toggle-btn" class="flex items-center space-x-2 bg-primary text-white px-6 py-2 rounded-full shadow-lg transition-all transform active:scale-95">
+                <span id="mic-icon">🎤</span>
+                <span id="btn-label" class="text-sm font-bold uppercase">Start Voice</span>
+            </button>
+        </div>
+
+        <div id="auth-overlay" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-[100] p-4">
+            <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl font-extrabold text-primary">Pearly's Estimator</h1>
+                    <p class="text-gray-500 mt-2">Sign in to manage your data</p>
+                </div>
+                
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+                        <input type="email" id="login-email" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none transition" placeholder="name@company.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                        <input type="password" id="login-password" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none transition" placeholder="••••••••">
+                    </div>
+                    
+                    <button type="submit" id="auth-btn" class="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-indigo-700 transition-all transform active:scale-95 shadow-lg shadow-indigo-200">
+                        Sign In / Register
+                    </button>
+                    <p id="auth-error" class="text-red-500 text-xs text-center mt-2 hidden"></p>
+                </form>
+            </div>
+        </div>
+
+        <div class="max-w-4xl mx-auto">
+            <div id="user-header" class="hidden flex justify-between items-center mb-6 px-2">
+                <span id="user-display" class="text-sm font-medium text-gray-600"></span>
+                <div class="flex items-center space-x-4">
+                    <button onclick="window.openMeasureModal()" class="px-4 py-2 bg-accent text-white text-xs font-bold rounded-lg uppercase tracking-wider shadow hover:bg-emerald-600 transition">Take Measurement</button>
+                    <button id="logout-btn" class="text-xs font-bold text-red-400 hover:text-red-600 uppercase tracking-wider transition">Logout</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl card-shadow mb-8 border-t-4 border-primary">          
+                <h2 class="text-2xl font-semibold mb-4 text-center text-primary border-b pb-2">ESTIMATE</h2>
+                <form id="invoice-form">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="companyName" class="block text-sm font-medium text-gray-700 mb-1">Company's Name</label>
+                            <input type="text" id="companyName" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition" placeholder="e.g., Acme Corp">
+                        </div>
+                        <div>
+                            <label for="jobDescription" class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                            <input type="text" id="jobDescription" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition" placeholder="e.g. Gates">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="location" class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                            <input type="text" id="location" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition">
+                        </div>
+                        <div>
+                            <label for="gpsLocation" class="block text-sm font-medium text-gray-700 mb-1">GPS Location</label>
+                            <input type="text" id="gpsLocation" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="contactNumbers" class="block text-sm font-medium text-gray-700 mb-1">Company Contact</label>
+                        <input type="text" id="contactNumbers" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition">
+                    </div>
+                    
+                    <hr class="my-6">
+
+                    <div class="mb-4">
+                        <label for="customerName" class="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                        <input type="text" id="customerName" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="customerContact" class="block text-sm font-medium text-gray-700 mb-1">Customer Contact</label>
+                            <input type="text" id="customerContact" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition">
+                        </div>
+                        <div>
+                            <label for="invoiceDate" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                            <input type="date" id="invoiceDate" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary transition">
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-gray-50 rounded-xl mb-4 border border-gray-200">
+                        <h3 class="text-lg font-semibold mb-3 text-gray-800">Add Line Item</h3>
+                        <div class="grid grid-cols-4 gap-3">
+                            <div class="col-span-4 md:col-span-2">
+                                <input type="text" id="itemName" placeholder="Item Name" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                            </div>
+                            <div class="col-span-2 md:col-span-1">
+                                <input type="number" id="quantity" placeholder="Qty" min="1" class="w-full p-2 border border-gray-300 rounded-lg text-sm" value="1">
+                            </div>
+                            <div class="col-span-2 md:col-span-1">
+                                <input type="number" id="unitPrice" placeholder="Price" min="0" step="0.01" class="w-full p-2 border border-gray-300 rounded-lg text-sm" value="0.00">
+                            </div>
+                        </div>
+                        <button type="button" id="addItemButton" class="w-full mt-3 px-4 py-2 bg-secondary text-white font-medium rounded-lg hover:bg-purple-700 transition">
+                            Add Item to List
+                        </button>
+                    </div>
+
+                    <div id="current-items-list" class="scrollable-list border border-gray-200 rounded-lg p-2 mb-4 bg-white min-h-[60px]"></div>
+
+                    <div class="mt-4 flex justify-end items-center p-3 bg-indigo-50 rounded-lg mb-4">
+                        <span id="grandTotalDisplay" class="text-3xl font-extrabold text-accent">GH¢ 0.00</span>
+                    </div>
+
+                    <button type="submit" id="saveButton" class="w-full px-6 py-3 bg-primary text-white font-bold rounded-lg hover:bg-indigo-700 transition flex items-center justify-center disabled:opacity-50" disabled>
+                        <span id="buttonText">Save Invoice</span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                <div class="bg-white p-6 rounded-xl card-shadow">
+                    <h2 class="text-xl font-bold mb-4 text-primary border-b pb-2">Recent Invoices</h2>
+                    <div id="invoices-list" class="space-y-3"></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl card-shadow">
+                    <h2 class="text-xl font-bold mb-4 text-accent border-b pb-2">Saved Measurements</h2>
+                    <div id="measurements-list" class="space-y-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="measureModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center p-4 z-[110]">
+            <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 class="text-xl font-bold text-primary">New Measurement</h2>
+                    <button onclick="window.closeMeasureModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <form id="measure-form" class="space-y-4">
+                    <input type="text" id="mCustomerName" placeholder="Customer Name" required class="w-full p-3 border rounded-xl">
+                    <input type="text" id="mItemName" placeholder="Item (e.g. Window, Burglar Proof)" required class="w-full p-3 border rounded-xl">
+                    
+                    <div class="grid grid-cols-3 gap-2">
+                        <input type="number" step="0.01" id="mLength" placeholder="Len" required class="p-3 border rounded-xl">
+                        <input type="number" step="0.01" id="mWidth" placeholder="Wid" required class="p-3 border rounded-xl">
+                        <input type="number" step="0.01" id="mHeight" placeholder="Hei" required class="p-3 border rounded-xl">
+                    </div>
+
+                    <select id="mUnit" class="w-full p-3 border rounded-xl bg-white">
+                        <option value="Inches">Inches (in)</option>
+                        <option value="Feet">Feet (ft)</option>
+                        <option value="Meters">Meters (m)</option>
+                        <option value="Centimeters">cm</option>
+                    </select>
+
+                    <button type="submit" class="w-full py-3 bg-accent text-white font-bold rounded-xl shadow-lg">Save Measurement</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="printModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-[120]">
+            <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div id="invoice-print-area" class="p-8 overflow-y-auto"></div>
+                <div class="p-4 bg-gray-100 flex justify-end space-x-3 print:hidden">
+                    <button onclick="window.closeModal()" class="px-4 py-2 border rounded-lg">Close</button>
+                    <button onclick="window.print()" class="px-6 py-2 bg-primary text-white rounded-lg font-bold">Print</button>
+                </div>
+            </div>
+        </div>
+        <br><br>
+        <a href="legal.html">Terms & Privacy</a>
+
+        <script type="module">
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+            import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+            import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyCHeqn6XDpPZUc46T1dl74maVruQhfYj9E",
+                authDomain: "section-a-3bc20.firebaseapp.com",
+                databaseURL: "https://section-a-3bc20-default-rtdb.europe-west1.firebasedatabase.app",
+                projectId: "section-a-3bc20",
+                storageBucket: "section-a-3bc20.firebasestorage.app",
+                messagingSenderId: "944136450248",
+                appId: "1:944136450248:web:72552f8accb738ebdd35fd"
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const rtdb = getDatabase(app);
+            
+            let userId = null;
+            let allInvoices = {};
+            let currentItems = [];
+
+            // --- AUDIO FEEDBACK LOGIC ---
+            function playBeep(frequency = 660, duration = 0.1) {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                
+                // Smooth fade out to prevent clicking sounds
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            }
+
+            // --- GLOBAL WINDOW FUNCTIONS (Fixes ReferenceErrors) ---
+            window.openMeasureModal = () => document.getElementById('measureModal').classList.remove('hidden');
+            window.closeMeasureModal = () => document.getElementById('measureModal').classList.add('hidden');
+            window.closeModal = () => document.getElementById('printModal').classList.add('hidden');
+
+            window.viewInvoice = (id) => {
+                const data = allInvoices[id];
+                if(!data) return;
+                const printArea = document.getElementById('invoice-print-area');
+                let rows = data.items.map(i => `<tr><td class="py-2 border-b">${i.itemName}
+                    </td><td class="text-center border-b">${i.quantity}</td><td class="text-right border-b">${i.unitPrice.toFixed(2)}</td><td 
+                    class="text-right font-bold border-b">${i.lineTotal.toFixed(2)}</td></tr>`).join('');
+                 printArea.innerHTML = `<div class="flex justify-between border-b-2 border-primary pb-4 mb-6"><div><h1 class="text-2xl font-bold 
+                    text-primary">${data.companyName}</h1><p class="text-xs">${data.jobDescription}</p><p class="text-xs">${data.location}</p><p class="text-xs">${data.companyContact}</p></div><div class="text-right"><h2 class="text-xl font-bold 
+                        text-gray-400">INVOICE</h2><p class="text-sm">${data.invoiceDate}</p></div></div><div class="mb-6"><p class="text-xs text-gray-500 uppercase 
+                            font-bold">Bill To:</p><p class="font-bold text-lg">${data.customerName}</p></div><table class="w-full text-left mb-6"><thead><tr 
+                                class="text-gray-600 border-b"><th>Description</th><th class="text-center">Qty</th><th class="text-right">Price</th><th class="
+                                text-right">Total</th></tr></thead><tbody>${rows}</tbody></table><div class="flex justify-end pt-4 border-t"><span class="font-bold text-lg mr-4">Grand
+                                     Total:</span><span class="font-extrabold text-2xl text-accent">GH¢ ${data.grandTotal.toFixed(2)}</span></div>`;
+                document.getElementById('printModal').classList.remove('hidden');
+            };
+
+            window.deleteMeasure = (id) => confirm("Delete measurement?") && remove(ref(rtdb, `measurements/${userId}/${id}`));
+
+            // --- AUTH & LISTENERS ---
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    document.getElementById('user-header').classList.remove('hidden');
+                    document.getElementById('user-display').textContent = `Account: ${user.email}`;
+                    setupDataListeners();
+                } else {
+                    userId = null;
+                    document.getElementById('auth-overlay').classList.remove('hidden');
+                    document.getElementById('user-header').classList.add('hidden');
+                }
+            });
+
+            // Login Logic
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (err) {
+                    try { await createUserWithEmailAndPassword(auth, email, password); } 
+                    catch (e) { alert(e.message); }
+                }
+            });
+
+            document.getElementById('logout-btn').onclick = () => signOut(auth);
+
+            // --- MEASUREMENT FORM SUBMIT ---
+            document.getElementById('measure-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const measureData = {
+                    customerName: document.getElementById('mCustomerName').value,
+                    item: document.getElementById('mItemName').value,
+                    length: document.getElementById('mLength').value,
+                    width: document.getElementById('mWidth').value,
+                    height: document.getElementById('mHeight').value,
+                    unit: document.getElementById('mUnit').value,
+                    timestamp: Date.now()
+                };
+                await push(ref(rtdb, `measurements/${userId}`), measureData);
+                document.getElementById('measure-form').reset();
+                window.closeMeasureModal();
+            });
+
+            // --- INVOICE LOGIC ---
+            function renderCurrentItems() {
+                const list = document.getElementById('current-items-list');
+                list.innerHTML = '';
+                let total = 0;
+                currentItems.forEach((item, index) => {
+                    total += item.lineTotal;
+                    list.innerHTML += `<div class="flex justify-between items-center p-2 border-b text-sm"><span>${item.itemName} 
+                        (${item.quantity})</span><span class="font-bold">GH¢ ${item.lineTotal.toFixed(2)}</span></div>`;
+                });
+                document.getElementById('grandTotalDisplay').textContent = `GH¢ ${total.toFixed(2)}`;
+                document.getElementById('saveButton').disabled = currentItems.length === 0;
+            }
+
+            document.getElementById('addItemButton').onclick = () => {
+                const name = document.getElementById('itemName').value;
+                const qty = parseFloat(document.getElementById('quantity').value);
+                const price = parseFloat(document.getElementById('unitPrice').value);
+                if(name && qty > 0) {
+                    currentItems.push({ itemName: name, quantity: qty, unitPrice: price, lineTotal: qty * price });
+                    renderCurrentItems();
+                    document.getElementById('itemName').value = '';
+                }
+            };
+
+            document.getElementById('invoice-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const invoiceData = {
+                    companyName: document.getElementById('companyName').value,
+                    customerName: document.getElementById('customerName').value,
+                    invoiceDate: document.getElementById('invoiceDate').value,
+                    location: document.getElementById('location').value,
+                    companyContact: document.getElementById('contactNumbers').value,
+                    jobDescription: document.getElementById('jobDescription').value,
+                    items: currentItems,
+                    grandTotal: currentItems.reduce((a, b) => a + b.lineTotal, 0)
+                };
+                await push(ref(rtdb, `invoices/${userId}`), invoiceData);
+                document.getElementById('invoice-form').reset();
+                currentItems = [];
+                renderCurrentItems();
+            });
+
+            function setupDataListeners() {
+                // Invoices
+                onValue(ref(rtdb, `invoices/${userId}`), (snap) => {
+                    const list = document.getElementById('invoices-list');
+                    list.innerHTML = '';
+                    if(snap.exists()) {
+                        allInvoices = snap.val();
+                        Object.keys(allInvoices).reverse().forEach(key => {
+                            const inv = allInvoices[key];
+                            list.innerHTML += `<div class="p-3 bg-gray-50 border rounded-lg flex justify-between items-center"><div 
+                                class="text-sm font-bold">${inv.customerName}</div><button onclick="window.viewInvoice('${key}')" 
+                                class="text-xs text-primary font-bold">VIEW</button></div>`;
+                        });
+                    }
+                });
+
+                // Measurements
+                onValue(ref(rtdb, `measurements/${userId}`), (snap) => {
+                    const list = document.getElementById('measurements-list');
+                    list.innerHTML = '';
+                    if(snap.exists()) {
+                        Object.entries(snap.val()).reverse().forEach(([key, m]) => {
+                            list.innerHTML += `<div class="p-3 border rounded-lg bg-emerald-50 mb-2"><div class="flex justify-between 
+                                font-bold text-emerald-800"><span>${m.customerName}</span><button onclick="window.deleteMeasure('${key}')" 
+                                class="text-red-400 text-xs">Delete</button></div><p class="text-xs text-emerald-600">${m.item}: ${m.length}
+                                    x${m.width}x${m.height} ${m.unit}</p></div>`;
+                        });
+                    }
+                });
+            }
+
+            window.onload = () => { document.getElementById('invoiceDate').valueAsDate = new Date(); };
+
+            // --- IMPROVED VOICE CONTROL LOGIC ---
+            const voiceBtn = document.getElementById('voice-toggle-btn');
+            const btnLabel = document.getElementById('btn-label');
+            const indicator = document.getElementById('voice-indicator');
+            const micIcon = document.getElementById('mic-icon');
+
+            let isListening = false;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.continuous = true; // Keeps it running until user stops it
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+
+                voiceBtn.addEventListener('click', () => {
+                    if (!isListening) {
+                        startListening();
+                    } else {
+                        stopListening();
+                    }
+                });
+
+                function startListening() {
+                    if (!SpeechRecognition) {
+                        alert("Your browser does not support Voice Recognition. Please use Chrome or Edge.");
+                        return;
+                    }
+                    try {
+                        recognition.start();
+                        isListening = true;
+                        
+                        // Play a high "Start" beep
+                        playBeep(880, 0.1); 
+
+                        voiceBtn.classList.add('mic-active');
+                        btnLabel.textContent = "Stop Recording";
+                        micIcon.textContent = "🛑";
+                        indicator.classList.remove('hidden');
+                    } catch (e) { console.error("Recognition already started"); }
+                }
+
+                function stopListening() {
+                    recognition.stop();
+                    isListening = false;
+                    
+                    // Play a lower "Stop" beep
+                    playBeep(440, 0.1);
+
+                    voiceBtn.classList.remove('mic-active');
+                    btnLabel.textContent = "Start Voice";
+                    micIcon.textContent = "🎤";
+                    indicator.classList.add('hidden');
+                }
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+                    alert("I heard: " + transcript); // This will confirm if the mic is actually working
+                    processVoiceCommand(transcript);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error("Speech Error:", event.error);
+                    stopListening();
+                };
+
+                // Auto-stop if the user is silent for too long
+                recognition.onspeechend = () => {
+                    // Optional: uncomment below if you want it to stop automatically
+                    // stopListening(); 
+                };
+            }
+
+            function processVoiceCommand(text) {
+                console.log("Processing:", text);
+                
+                // Fill Metadata
+                if (text.includes("business name")) {
+                    document.getElementById('companyName').value = extractValue(text, "business name");
+                }
+                if (text.includes("location")) {
+                    document.getElementById('location').value = extractValue(text, "location");
+                }
+                if (text.includes("customer name")) {
+                    document.getElementById('customerName').value = extractValue(text, "customer name");
+                }
+                if (text.includes("contact")) {
+                    document.getElementById('contactNumbers').value = extractValue(text, "contact");
+                }
+
+                // Add Items (e.g. "Add item cement quantity 5 price 100")
+                if (text.includes("add item")) {
+                    const parts = text.split("add item")[1];
+                    const itemName = parts.split("quantity")[0].trim();
+                    const qtyMatch = text.match(/quantity (\d+)/);
+                    const priceMatch = text.match(/price (\d+)/);
+
+                    if (itemName && qtyMatch && priceMatch) {
+                        const qty = parseFloat(qtyMatch[1]);
+                        const price = parseFloat(priceMatch[1]);
+                        
+                        currentItems.push({ 
+                            itemName: itemName.toUpperCase(), 
+                            quantity: qty, 
+                            unitPrice: price, 
+                            lineTotal: qty * price 
+                        });
+                        renderCurrentItems(); // This updates the list on screen
+                        playBeep(900, 0.2);   // Success sound
+                    }
+                }
+
+                // NEW: Voice Command to Save
+                if (text.includes("save invoice") || text.includes("finish")) {
+                    document.getElementById('saveButton').click();
+                    alert("Invoice Saved!");
+                }
+            }
+            function extractValue(str, keyword) {
+                const parts = str.split(keyword);
+                return parts.length > 1 ? parts[1].trim() : "";
+            }
+        </script>
+    </body>
+</html>

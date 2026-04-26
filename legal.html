@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal - Pearly's Estimator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4f46e5',
+                        'accent': '#10b981',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f9fafb; color: #374151; }
+        .legal-card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="p-4 md:p-12">
+
+    <div class="max-w-3xl mx-auto">
+        <div class="mb-8 flex items-center justify-between">
+            <h1 class="text-2xl font-extrabold text-primary">Pearly's Estimator</h1>
+            <a href="index.html" class="text-sm font-bold text-primary hover:underline">← Back to Estimator</a>
+        </div>
+
+        <section class="legal-card p-8 mb-8 border-t-4 border-primary">
+            <h2 class="text-3xl font-bold mb-6 text-gray-900">Privacy Policy</h2>
+            <p class="text-sm text-gray-500 mb-6">Last Updated: April 2026</p>
+
+            <div class="space-y-6">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">1. Information We Collect</h3>
+                    <p class="mt-2">When you use Pearly's Estimator, we collect data necessary to manage your invoices and measurements. This includes:</p>
+                    <ul class="list-disc ml-6 mt-2 space-y-1">
+                        <li><strong>Account Data:</strong> Email address and password via Authentication.</li>
+                        <li><strong>Business Data:</strong> Company names, contact numbers, and location details.</li>
+                        <li><strong>Client Data:</strong> Names and contacts of your customers for invoice generation.</li>
+                        <li><strong>Voice Data:</strong> Temporary audio processing via the Web Speech API (audio is processed locally and not stored on our servers).</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">2. How We Use Data</h3>
+                    <p class="mt-2">Your data is used solely to provide the estimation service. We use Firebase Realtime Database to store your records so you can access them across different devices.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">3. Data Security</h3>
+                    <p class="mt-2">We utilize Firebase security protocols to protect your information. However, as a digital tool, no method of transmission is 100% secure. You are responsible for keeping your login credentials confidential.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="legal-card p-8 border-t-4 border-accent">
+            <h2 class="text-3xl font-bold mb-6 text-gray-900">Terms & Conditions</h2>
+            
+            <div class="space-y-6">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">1. Acceptance of Terms</h3>
+                    <p class="mt-2">By creating an account or using Pearly's Estimator, you agree to be bound by these terms. This tool is designed for business estimation and record-keeping.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">2. User Responsibilities</h3>
+                    <p class="mt-2">Users are responsible for the accuracy of the measurements and invoice totals generated. Pearly's Estimator is a calculation tool and does not constitute a legal financial audit.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">3. Voice Control Feature</h3>
+                    <p class="mt-2">The voice command feature is provided "as is." Recognition accuracy depends on browser compatibility and environmental noise. Use this feature at your own discretion in professional environments.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">4. Limitation of Liability</h3>
+                    <p class="mt-2 text-gray-600 italic">Abaye John Kwaku and Pearly's Estimator shall not be liable for any financial discrepancies, data loss, or business interruptions resulting from the use of this software.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="mt-12 text-center text-gray-400 text-xs">
+            <p>&copy; 2026 Pearly's Estimator. Developed by Abaye John Kwaku.</p>
+        </footer>
+    </div>
+
+</body>
+</html>
