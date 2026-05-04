@@ -243,317 +243,236 @@
         <a href="legal.html">Terms & Privacy</a>
 
         <script type="module">
-            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-            import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-            import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+                import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+                import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+                import { getDatabase, ref, push, onValue, remove, query, orderByChild, startAt, endAt } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
-            const firebaseConfig = {
-                apiKey: "AIzaSyCHeqn6XDpPZUc46T1dl74maVruQhfYj9E",
-                authDomain: "section-a-3bc20.firebaseapp.com",
-                databaseURL: "https://section-a-3bc20-default-rtdb.europe-west1.firebasedatabase.app",
-                projectId: "section-a-3bc20",
-                storageBucket: "section-a-3bc20.firebasestorage.app",
-                messagingSenderId: "944136450248",
-                appId: "1:944136450248:web:72552f8accb738ebdd35fd"
-            };
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCHeqn6XDpPZUc46T1dl74maVruQhfYj9E",
+                    authDomain: "section-a-3bc20.firebaseapp.com",
+                    databaseURL: "https://section-a-3bc20-default-rtdb.europe-west1.firebasedatabase.app",
+                    projectId: "section-a-3bc20",
+                    storageBucket: "section-a-3bc20.firebasestorage.app",
+                    messagingSenderId: "944136450248",
+                    appId: "1:944136450248:web:72552f8accb738ebdd35fd"
+                };
 
-            const app = initializeApp(firebaseConfig);
-            const auth = getAuth(app);
-            const rtdb = getDatabase(app);
-            
-            let userId = null;
-            let allInvoices = {};
-            let currentItems = [];
-
-            // --- AUDIO FEEDBACK LOGIC ---
-            function playBeep(frequency = 660, duration = 0.1) {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const rtdb = getDatabase(app);
                 
-                // Smooth fade out to prevent clicking sounds
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                let userId = null;
+                let allInvoices = {};
+                let currentItems = [];
 
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + duration);
-            }
+                // --- UI SETUP FOR SEARCH ---
+                // Replacing the voice button area with a search bar
+                const topBar = document.querySelector('.max-w-4xl.mx-auto.mb-4');
+                topBar.innerHTML = `
+                    <div class="relative w-full max-w-md">
+                        <input type="text" id="customerSearch" placeholder="Search customer name..." 
+                            class="w-full p-3 pl-10 rounded-full border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary outline-none">
+                        <span class="absolute left-4 top-3.5">🔍</span>
+                    </div>
+                `;
 
-            // --- GLOBAL WINDOW FUNCTIONS (Fixes ReferenceErrors) ---
-            window.openMeasureModal = () => document.getElementById('measureModal').classList.remove('hidden');
-            window.closeMeasureModal = () => document.getElementById('measureModal').classList.add('hidden');
-            window.closeModal = () => document.getElementById('printModal').classList.add('hidden');
+                // --- GLOBAL WINDOW FUNCTIONS ---
+                window.openMeasureModal = () => document.getElementById('measureModal').classList.remove('hidden');
+                window.closeMeasureModal = () => document.getElementById('measureModal').classList.add('hidden');
+                window.closeModal = () => document.getElementById('printModal').classList.add('hidden');
 
-            window.viewInvoice = (id) => {
-                const data = allInvoices[id];
-                if(!data) return;
-                const printArea = document.getElementById('invoice-print-area');
-                let rows = data.items.map(i => `<tr><td class="py-2 border-b">${i.itemName}
-                    </td><td class="text-center border-b">${i.quantity}</td><td class="text-right border-b">${i.unitPrice.toFixed(2)}</td><td 
-                    class="text-right font-bold border-b">${i.lineTotal.toFixed(2)}</td></tr>`).join('');
-                 printArea.innerHTML = `<div class="flex justify-between border-b-2 border-primary pb-4 mb-6"><div><h1 class="text-2xl font-bold 
-                    text-primary">${data.companyName}</h1><p class="text-xs">${data.jobDescription}</p><p class="text-xs">${data.location}</p><p class="text-xs">${data.companyContact}</p></div><div class="text-right"><h2 class="text-xl font-bold 
-                        text-gray-400">INVOICE</h2><p class="text-sm">${data.invoiceDate}</p></div></div><div class="mb-6"><p class="text-xs text-gray-500 uppercase 
-                            font-bold">Bill To:</p><p class="font-bold text-lg">${data.customerName}</p></div><table class="w-full text-left mb-6"><thead><tr 
-                                class="text-gray-600 border-b"><th>Description</th><th class="text-center">Qty</th><th class="text-right">Price</th><th class="
-                                text-right">Total</th></tr></thead><tbody>${rows}</tbody></table><div class="flex justify-end pt-4 border-t"><span class="font-bold text-lg mr-4">Grand
-                                     Total:</span><span class="font-extrabold text-2xl text-accent">GH¢ ${data.grandTotal.toFixed(2)}</span></div>`;
-                document.getElementById('printModal').classList.remove('hidden');
-            };
-
-            window.deleteMeasure = (id) => confirm("Delete measurement?") && remove(ref(rtdb, `measurements/${userId}/${id}`));
-
-            // --- AUTH & LISTENERS ---
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    userId = user.uid;
-                    document.getElementById('auth-overlay').classList.add('hidden');
-                    document.getElementById('user-header').classList.remove('hidden');
-                    document.getElementById('user-display').textContent = `Account: ${user.email}`;
-                    setupDataListeners();
-                } else {
-                    userId = null;
-                    document.getElementById('auth-overlay').classList.remove('hidden');
-                    document.getElementById('user-header').classList.add('hidden');
-                }
-            });
-
-            // Login Logic
-            document.getElementById('login-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('login-email').value;
-                const password = document.getElementById('login-password').value;
-                try {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } catch (err) {
-                    try { await createUserWithEmailAndPassword(auth, email, password); } 
-                    catch (e) { alert(e.message); }
-                }
-            });
-
-            document.getElementById('logout-btn').onclick = () => signOut(auth);
-
-            // --- MEASUREMENT FORM SUBMIT ---
-            document.getElementById('measure-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const measureData = {
-                    customerName: document.getElementById('mCustomerName').value,
-                    item: document.getElementById('mItemName').value,
-                    length: document.getElementById('mLength').value,
-                    width: document.getElementById('mWidth').value,
-                    height: document.getElementById('mHeight').value,
-                    unit: document.getElementById('mUnit').value,
-                    timestamp: Date.now()
+                window.viewInvoice = (id) => {
+                    const data = allInvoices[id];
+                    if(!data) return;
+                    const printArea = document.getElementById('invoice-print-area');
+                    let rows = data.items.map(i => `
+                        <tr>
+                            <td class="py-2 border-b">${i.itemName}</td>
+                            <td class="text-center border-b">${i.quantity}</td>
+                            <td class="text-right border-b">${i.unitPrice.toFixed(2)}</td>
+                            <td class="text-right font-bold border-b">${i.lineTotal.toFixed(2)}</td>
+                        </tr>`).join('');
+                    
+                    printArea.innerHTML = `
+                        <div class="flex justify-between border-b-2 border-primary pb-4 mb-6">
+                            <div>
+                                <h1 class="text-2xl font-bold text-primary">${data.companyName}</h1>
+                                <p class="text-xs">${data.jobDescription}</p>
+                                <p class="text-xs">${data.location}</p>
+                            </div>
+                            <div class="text-right">
+                                <h2 class="text-xl font-bold text-gray-400">INVOICE</h2>
+                                <p class="text-sm">${data.invoiceDate}</p>
+                            </div>
+                        </div>
+                        <div class="mb-6">
+                            <p class="text-xs text-gray-500 uppercase font-bold">Bill To:</p>
+                            <p class="font-bold text-lg">${data.customerName}</p>
+                        </div>
+                        <table class="w-full text-left mb-6">
+                            <thead>
+                                <tr class="text-gray-600 border-b">
+                                    <th>Description</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-right">Price</th>
+                                    <th class="text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                        <div class="flex justify-end pt-4 border-t">
+                            <span class="font-bold text-lg mr-4">Grand Total:</span>
+                            <span class="font-extrabold text-2xl text-accent">GH¢ ${data.grandTotal.toFixed(2)}</span>
+                        </div>`;
+                    document.getElementById('printModal').classList.remove('hidden');
                 };
-                await push(ref(rtdb, `measurements/${userId}`), measureData);
-                document.getElementById('measure-form').reset();
-                window.closeMeasureModal();
-            });
 
-            // --- INVOICE LOGIC ---
-            function renderCurrentItems() {
-                const list = document.getElementById('current-items-list');
-                list.innerHTML = '';
-                let total = 0;
-                currentItems.forEach((item, index) => {
-                    total += item.lineTotal;
-                    list.innerHTML += `<div class="flex justify-between items-center p-2 border-b text-sm"><span>${item.itemName} 
-                        (${item.quantity})</span><span class="font-bold">GH¢ ${item.lineTotal.toFixed(2)}</span></div>`;
+                window.deleteMeasure = (id) => confirm("Delete measurement?") && remove(ref(rtdb, `measurements/${userId}/${id}`));
+
+                // --- AUTH & LISTENERS ---
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('auth-overlay').classList.add('hidden');
+                        document.getElementById('user-header').classList.remove('hidden');
+                        document.getElementById('user-display').textContent = `Account: ${user.email}`;
+                        setupDataListeners();
+                    } else {
+                        userId = null;
+                        document.getElementById('auth-overlay').classList.remove('hidden');
+                        document.getElementById('user-header').classList.add('hidden');
+                    }
                 });
-                document.getElementById('grandTotalDisplay').textContent = `GH¢ ${total.toFixed(2)}`;
-                document.getElementById('saveButton').disabled = currentItems.length === 0;
-            }
 
-            document.getElementById('addItemButton').onclick = () => {
-                const name = document.getElementById('itemName').value;
-                const qty = parseFloat(document.getElementById('quantity').value);
-                const price = parseFloat(document.getElementById('unitPrice').value);
-                if(name && qty > 0) {
-                    currentItems.push({ itemName: name, quantity: qty, unitPrice: price, lineTotal: qty * price });
-                    renderCurrentItems();
-                    document.getElementById('itemName').value = '';
+                // Login Logic
+                document.getElementById('login-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('login-email').value;
+                    const password = document.getElementById('login-password').value;
+                    try {
+                        await signInWithEmailAndPassword(auth, email, password);
+                    } catch (err) {
+                        try { await createUserWithEmailAndPassword(auth, email, password); } 
+                        catch (e) { alert(e.message); }
+                    }
+                });
+
+                document.getElementById('logout-btn').onclick = () => signOut(auth);
+
+                // --- DATA LISTENERS & SEARCH LOGIC ---
+                function setupDataListeners() {
+                    const invoicesList = document.getElementById('invoices-list');
+                    const searchInput = document.getElementById('customerSearch');
+
+                    // Main Listener for Invoices
+                    onValue(ref(rtdb, `invoices/${userId}`), (snap) => {
+                        if(snap.exists()) {
+                            allInvoices = snap.val();
+                            renderInvoices(allInvoices);
+                        } else {
+                            invoicesList.innerHTML = '<p class="text-gray-400 text-sm italic">No invoices found.</p>';
+                        }
+                    });
+
+                    // Search Implementation
+                    searchInput.addEventListener('input', (e) => {
+                        const term = e.target.value.toLowerCase();
+                        const filtered = {};
+                        
+                        Object.keys(allInvoices).forEach(key => {
+                            if (allInvoices[key].customerName.toLowerCase().includes(term)) {
+                                filtered[key] = allInvoices[key];
+                            }
+                        });
+                        renderInvoices(filtered);
+                    });
+
+                    // Measurements Listener
+                    onValue(ref(rtdb, `measurements/${userId}`), (snap) => {
+                        const list = document.getElementById('measurements-list');
+                        list.innerHTML = '';
+                        if(snap.exists()) {
+                            Object.entries(snap.val()).reverse().forEach(([key, m]) => {
+                                list.innerHTML += `
+                                    <div class="p-3 border rounded-lg bg-emerald-50 mb-2">
+                                        <div class="flex justify-between font-bold text-emerald-800">
+                                            <span>${m.customerName}</span>
+                                            <button onclick="window.deleteMeasure('${key}')" class="text-red-400 text-xs">Delete</button>
+                                        </div>
+                                        <p class="text-xs text-emerald-600">${m.item}: ${m.length} x ${m.width} x ${m.height} ${m.unit}</p>
+                                    </div>`;
+                            });
+                        }
+                    });
                 }
-            };
 
-            document.getElementById('invoice-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const invoiceData = {
-                    companyName: document.getElementById('companyName').value,
-                    customerName: document.getElementById('customerName').value,
-                    invoiceDate: document.getElementById('invoiceDate').value,
-                    location: document.getElementById('location').value,
-                    companyContact: document.getElementById('contactNumbers').value,
-                    jobDescription: document.getElementById('jobDescription').value,
-                    items: currentItems,
-                    grandTotal: currentItems.reduce((a, b) => a + b.lineTotal, 0)
-                };
-                await push(ref(rtdb, `invoices/${userId}`), invoiceData);
-                document.getElementById('invoice-form').reset();
-                currentItems = [];
-                renderCurrentItems();
-            });
-
-            function setupDataListeners() {
-                // Invoices
-                onValue(ref(rtdb, `invoices/${userId}`), (snap) => {
+                function renderInvoices(dataObj) {
                     const list = document.getElementById('invoices-list');
                     list.innerHTML = '';
-                    if(snap.exists()) {
-                        allInvoices = snap.val();
-                        Object.keys(allInvoices).reverse().forEach(key => {
-                            const inv = allInvoices[key];
-                            list.innerHTML += `<div class="p-3 bg-gray-50 border rounded-lg flex justify-between items-center"><div 
-                                class="text-sm font-bold">${inv.customerName}</div><button onclick="window.viewInvoice('${key}')" 
-                                class="text-xs text-primary font-bold">VIEW</button></div>`;
-                        });
-                    }
-                });
-
-                // Measurements
-                onValue(ref(rtdb, `measurements/${userId}`), (snap) => {
-                    const list = document.getElementById('measurements-list');
-                    list.innerHTML = '';
-                    if(snap.exists()) {
-                        Object.entries(snap.val()).reverse().forEach(([key, m]) => {
-                            list.innerHTML += `<div class="p-3 border rounded-lg bg-emerald-50 mb-2"><div class="flex justify-between 
-                                font-bold text-emerald-800"><span>${m.customerName}</span><button onclick="window.deleteMeasure('${key}')" 
-                                class="text-red-400 text-xs">Delete</button></div><p class="text-xs text-emerald-600">${m.item}: ${m.length}
-                                    x${m.width}x${m.height} ${m.unit}</p></div>`;
-                        });
-                    }
-                });
-            }
-
-            window.onload = () => { document.getElementById('invoiceDate').valueAsDate = new Date(); };
-
-            // --- IMPROVED VOICE CONTROL LOGIC ---
-            const voiceBtn = document.getElementById('voice-toggle-btn');
-            const btnLabel = document.getElementById('btn-label');
-            const indicator = document.getElementById('voice-indicator');
-            const micIcon = document.getElementById('mic-icon');
-
-            let isListening = false;
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-            if (SpeechRecognition) {
-                const recognition = new SpeechRecognition();
-                recognition.continuous = true; // Keeps it running until user stops it
-                recognition.interimResults = false;
-                recognition.lang = 'en-US';
-
-                voiceBtn.addEventListener('click', () => {
-                    if (!isListening) {
-                        startListening();
-                    } else {
-                        stopListening();
-                    }
-                });
-
-                function startListening() {
-                    if (!SpeechRecognition) {
-                        alert("Your browser does not support Voice Recognition. Please use Chrome or Edge.");
+                    const keys = Object.keys(dataObj).reverse();
+                    
+                    if (keys.length === 0) {
+                        list.innerHTML = '<p class="text-gray-400 text-xs">No matches found.</p>';
                         return;
                     }
-                    try {
-                        recognition.start();
-                        isListening = true;
-                        
-                        // Play a high "Start" beep
-                        playBeep(880, 0.1); 
 
-                        voiceBtn.classList.add('mic-active');
-                        btnLabel.textContent = "Stop Recording";
-                        micIcon.textContent = "🛑";
-                        indicator.classList.remove('hidden');
-                    } catch (e) { console.error("Recognition already started"); }
+                    keys.forEach(key => {
+                        const inv = dataObj[key];
+                        list.innerHTML += `
+                            <div class="p-3 bg-gray-50 border rounded-lg flex justify-between items-center">
+                                <div>
+                                    <div class="text-sm font-bold">${inv.customerName}</div>
+                                    <div class="text-[10px] text-gray-400">${inv.invoiceDate}</div>
+                                </div>
+                                <button onclick="window.viewInvoice('${key}')" class="px-3 py-1 bg-primary/10 text-primary rounded-md text-xs font-bold hover:bg-primary hover:text-white transition">VIEW</button>
+                            </div>`;
+                    });
                 }
 
-                function stopListening() {
-                    recognition.stop();
-                    isListening = false;
-                    
-                    // Play a lower "Stop" beep
-                    playBeep(440, 0.1);
-
-                    voiceBtn.classList.remove('mic-active');
-                    btnLabel.textContent = "Start Voice";
-                    micIcon.textContent = "🎤";
-                    indicator.classList.add('hidden');
-                }
-
-                recognition.onresult = (event) => {
-                    const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-                    alert("I heard: " + transcript); // This will confirm if the mic is actually working
-                    processVoiceCommand(transcript);
-                };
-
-                recognition.onerror = (event) => {
-                    console.error("Speech Error:", event.error);
-                    stopListening();
-                };
-
-                // Auto-stop if the user is silent for too long
-                recognition.onspeechend = () => {
-                    // Optional: uncomment below if you want it to stop automatically
-                    // stopListening(); 
-                };
-            }
-
-            function processVoiceCommand(text) {
-                console.log("Processing:", text);
-                
-                // Fill Metadata
-                if (text.includes("business name")) {
-                    document.getElementById('companyName').value = extractValue(text, "business name");
-                }
-                if (text.includes("location")) {
-                    document.getElementById('location').value = extractValue(text, "location");
-                }
-                if (text.includes("customer name")) {
-                    document.getElementById('customerName').value = extractValue(text, "customer name");
-                }
-                if (text.includes("contact")) {
-                    document.getElementById('contactNumbers').value = extractValue(text, "contact");
-                }
-
-                // Add Items (e.g. "Add item cement quantity 5 price 100")
-                if (text.includes("add item")) {
-                    const parts = text.split("add item")[1];
-                    const itemName = parts.split("quantity")[0].trim();
-                    const qtyMatch = text.match(/quantity (\d+)/);
-                    const priceMatch = text.match(/price (\d+)/);
-
-                    if (itemName && qtyMatch && priceMatch) {
-                        const qty = parseFloat(qtyMatch[1]);
-                        const price = parseFloat(priceMatch[1]);
-                        
-                        currentItems.push({ 
-                            itemName: itemName.toUpperCase(), 
-                            quantity: qty, 
-                            unitPrice: price, 
-                            lineTotal: qty * price 
-                        });
-                        renderCurrentItems(); // This updates the list on screen
-                        playBeep(900, 0.2);   // Success sound
+                // Invoice Form Logic
+                document.getElementById('addItemButton').onclick = () => {
+                    const name = document.getElementById('itemName').value;
+                    const qty = parseFloat(document.getElementById('quantity').value);
+                    const price = parseFloat(document.getElementById('unitPrice').value);
+                    if(name && qty > 0) {
+                        currentItems.push({ itemName: name, quantity: qty, unitPrice: price, lineTotal: qty * price });
+                        renderCurrentItems();
+                        document.getElementById('itemName').value = '';
                     }
+                };
+
+                function renderCurrentItems() {
+                    const list = document.getElementById('current-items-list');
+                    list.innerHTML = '';
+                    let total = 0;
+                    currentItems.forEach((item) => {
+                        total += item.lineTotal;
+                        list.innerHTML += `<div class="flex justify-between items-center p-2 border-b text-sm"><span>${item.itemName} (${item.quantity})</span><span class="font-bold">GH¢ ${item.lineTotal.toFixed(2)}</span></div>`;
+                    });
+                    document.getElementById('grandTotalDisplay').textContent = `GH¢ ${total.toFixed(2)}`;
+                    document.getElementById('saveButton').disabled = currentItems.length === 0;
                 }
 
-                // NEW: Voice Command to Save
-                if (text.includes("save invoice") || text.includes("finish")) {
-                    document.getElementById('saveButton').click();
-                    alert("Invoice Saved!");
-                }
-            }
-            function extractValue(str, keyword) {
-                const parts = str.split(keyword);
-                return parts.length > 1 ? parts[1].trim() : "";
-            }
+                document.getElementById('invoice-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const invoiceData = {
+                        companyName: document.getElementById('companyName').value,
+                        customerName: document.getElementById('customerName').value,
+                        invoiceDate: document.getElementById('invoiceDate').value,
+                        location: document.getElementById('location').value,
+                        companyContact: document.getElementById('contactNumbers').value,
+                        jobDescription: document.getElementById('jobDescription').value,
+                        items: currentItems,
+                        grandTotal: currentItems.reduce((a, b) => a + b.lineTotal, 0)
+                    };
+                    await push(ref(rtdb, `invoices/${userId}`), invoiceData);
+                    document.getElementById('invoice-form').reset();
+                    currentItems = [];
+                    renderCurrentItems();
+                    document.getElementById('invoiceDate').valueAsDate = new Date();
+                });
+
+            window.onload = () => { document.getElementById('invoiceDate').valueAsDate = new Date(); };
         </script>
     </body>
 </html>
